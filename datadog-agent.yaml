@@ -1,0 +1,36 @@
+package:
+  name: datadog-agent
+  version: 7.48.0
+  epoch: 0
+  description: Collect events and metrics from your hosts that send data to Datadog.
+  copyright:
+    - license: Apache-2.0
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - ca-certificates-bundle
+      - build-base
+      - go
+      - python-3-dev
+      - py3-pip
+      - cmake
+      - gcc-12
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/DataDog/datadog-agent
+      tag: ${{package.version}}
+      expected-commit: 8e04ee8a7de780174deeb963b61f4ca6fc129462
+
+  - runs: |
+      pip install awscli boto3 codeowners docker docker-squash dulwich invoke packaging reno requests toml urllib3
+      invoke install-tools
+      invoke agent.build --build-exclude=systemd
+
+update:
+  enabled: true
+  github:
+    identifier: DataDog/datadog-agent
