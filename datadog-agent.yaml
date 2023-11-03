@@ -1,6 +1,6 @@
 package:
   name: datadog-agent
-  version: 7.48.0
+  version: 7.49.0
   epoch: 0
   description: Collect events and metrics from your hosts that send data to Datadog.
   copyright:
@@ -23,7 +23,7 @@ pipeline:
     with:
       repository: https://github.com/DataDog/datadog-agent
       tag: ${{package.version}}
-      expected-commit: 8e04ee8a7de780174deeb963b61f4ca6fc129462
+      expected-commit: 9cb8e9c21c08e695b9d2da79d0aba809dbf33d58
 
   - runs: |
       pip install awscli boto3 codeowners docker docker-squash dulwich invoke packaging reno requests toml urllib3
