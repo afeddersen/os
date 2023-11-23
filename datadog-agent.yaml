@@ -12,14 +12,21 @@ package:
 environment:
   contents:
     packages:
+      - build-base
       - busybox
       - ca-certificates-bundle
-      - build-base
-      - go-1.20
-      - python-3-dev
-      - py3-pip
       - cmake
+      - coreutils
       - gcc-12
+      - go-1.20
+      - py3-pip
+      - python-3-dev
+
+  environment:
+    CGO_ENABLED: "1"
+    CGO_CFLAGS: "-Os -I/build/datadog-agent/dev/include"
+    CGO_LDFLAGS: "-L/build/datadog-agent/dev/lib"
+    GOFLAGS: "-ldflags=-w -ldflags=-s"
 
 pipeline:
   - uses: git-checkout
@@ -29,10 +36,66 @@ pipeline:
       expected-commit: 9cb8e9c21c08e695b9d2da79d0aba809dbf33d58
 
   - runs: |
+      mkdir -p ${{targets.destdir}}/build/datadog-agent
+  
+  - runs: |
       pip install awscli boto3 codeowners docker docker-squash dulwich invoke packaging reno requests toml urllib3
+
+  - runs: |
+      # Setup Golang dependencies
       invoke deps
+      # Setup Golang tooling
       invoke install-tools
-      invoke agent.build --build-exclude=systemd
+  
+  - runs: |
+      # Build the agent
+      invoke agent.build \
+        --python-runtimes=3 \
+        --build-exclude=systemd \
+        --pty
+
+  - runs: |
+      invoke rtloader.make \
+        --python-runtimes=3 \
+        --cmake-options="\
+          -DCMAKE_INSTALL_LIBDIR=lib \
+          -DCMAKE_CXX_FLAGS=-Os \
+          -DCMAKE_C_FLAGS=-Os" \
+      && invoke rtloader.install
+
+  - runs: |
+      mkdir -p \
+        /opt/datadog-agent/bin/agent/dist \
+        /opt/datadog-agent/run \
+        /etc/datadog-agent \
+      && touch /opt/datadog-agent/requirements-agent-release.txt \
+      && touch /opt/datadog-agent/final_constraints-py3.txt
+
+  - runs: |
+      cp /home/datadog-agent/bin/agent/agent /opt/datadog-agent/bin/agent/agent
+
+  - runs: |
+      cp -r \
+        /home/datadog-agent/bin/agent/dist/checks \
+        /home/datadog-agent/bin/agent/dist/config.py \
+        /home/datadog-agent/bin/agent/dist/utils \
+        /home/datadog-agent/bin/agent/dist/views \
+        /opt/datadog-agent/bin/agent/dist/
+  
+  - runs: |
+      cp -r /home/datadog-agent/bin/agent/dist/conf.d /etc/datadog-agent/conf.d/
+  
+  - runs: |
+      cp \
+        /home/datadog-agent/Dockerfiles/agent/datadog-docker.yaml \
+        /home/datadog-agent/Dockerfiles/agent/datadog-ecs.yaml \
+        /home/datadog-agent/bin/agent/dist/system-probe.yaml \
+        /etc/datadog-agent/
+  
+  - runs: |
+      cp \
+        /home/datadog-agent/bin/agent/dist/datadog.yaml \
+        /etc/datadog-agent/datadog.yaml.example
 
 update:
   enabled: true
